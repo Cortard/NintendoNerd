@@ -89,12 +89,40 @@ Even fewer people have reached this final level. Congratulations to them!
 
 */
 
+void ForwardReadable(u8 output[32])
+{
+    for(u32 i=0;i<256;i++)
+    {
+        for(u8 j=0;j<32;j++)
+        {
+            output[j]=confusion[input[j]];
+            input[j]=0;
+        }
+
+        for(u8 j=0;j<32;j++)
+            for(u8 k=0;k<32;k++)
+                input[j]^= output[k] * ((diffusion[j] >> k) & 1);
+    }
+    for(u8 i=0;i<16;i++)
+        output[i]= confusion[input[i * 2]] ^ confusion[input[i * 2 + 1] + 256];
+}
+
+#include <stdio.h>
+void resolve(u8* target, u8* solution){
+    //pour chaque caractere on cherche une paire de valeur x, y telle que confusion[x]^confusion[y]=target
+}
+
 int main(int argc, char* argv[])
 {
     u8 target[]="Hire me!!!!!!!!";
     u8 output[32];
 
     Forward(input,output,confusion,diffusion);
+
+    u8 solution[32];
+    resolve(target, solution);
+
+    printf("Output : %s, Solution : %s\n", output,solution);
 
     return memcmp(output,target,16); // => contact apply(at)nerd.nintendo.com
 }
