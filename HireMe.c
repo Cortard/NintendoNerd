@@ -185,8 +185,6 @@ void initPairs(const u8 target[], Pairs pairs[], u8 searchSize,PositionInConfusi
                 }
         }
     }
-
-    //todoo suprime paires impossible
 }
 
 void resolve(u8* target, u8* solution){
