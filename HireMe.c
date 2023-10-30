@@ -107,9 +107,106 @@ void ForwardReadable(u8 output[32])
         output[i]= confusion[input[i * 2]] ^ confusion[input[i * 2 + 1] + 256];
 }
 
+
 #include <stdio.h>
+#include <malloc.h>
+
+#include <time.h>
+void printTime(clock_t start, char msg[]){
+    clock_t end = clock();
+    double elapsed = ((double)end - (double)start)/CLOCKS_PER_SEC;
+    printf("%s : %.3f seconds\n",msg, elapsed);
+}
+
+//A=absent P=present _=rang 256s
+//0b[00][00] => 0b[nbPresentSecondPart][nbPresentFirstPart]
+#define A       0  //=> 0b0000
+#define P_A     1  //=> 0b0001
+#define PP_A    2  //=> 0b0010
+#define A_P     4  //=> 0b0100
+#define P_P     5  //=> 0b0101
+#define PP_P    6  //=> 0b0110
+#define A_PP    8  //=> 0b1000
+#define P_PP    9  //=> 0b1001
+#define NUMBER_ON_LEFT(x) (x&3) //=>0b00xx
+#define NUMBER_ON_RIGHT(x) ((x>>2)&3) //=>0bxx00 => 0b00xx
+typedef struct PositionInConfusion{
+    u8 type;
+    u8 position[3];
+} PositionInConfusion;
+
+void initPositionsInConfusions(PositionInConfusion tab[256]){
+    for(PositionInConfusion* it=tab;it<tab+256;++it) it->type=0;
+    u8* it=confusion;
+    u8* mid=confusion+256;
+    u8* end=confusion+512;
+    for(;it<end;++it){
+        tab[*it].position[NUMBER_ON_LEFT(tab[*it].type)+NUMBER_ON_RIGHT(tab[*it].type)]=it-confusion;
+        tab[*it].type+=( 1<<( (it>=mid)*2 ) );
+    }
+};
+
+typedef struct Pair{
+    u32 rank[2];
+}Pair;
+typedef struct Pairs{
+    u32 numberOfPairs;
+    Pair* pairs;
+} Pairs;
+void initPairs(const u8 target[], Pairs pairs[], u8 searchSize,PositionInConfusion posInConf[]){
+    for(u8 i=0; i<searchSize;++i) {
+        pairs[i].numberOfPairs=1;
+        u8 generation[8];
+        for (u8 bitNum = 0; bitNum < 8; ++bitNum){
+            generation[bitNum]= (target[i] >> bitNum) & 1;
+            if (generation[bitNum])
+                pairs[i].numberOfPairs *= 3;
+        }
+        pairs[i].pairs= malloc(pairs[i].numberOfPairs*sizeof(Pair));
+        for(u32 numPair=0;numPair<pairs[i].numberOfPairs;++numPair){
+            pairs[i].pairs[numPair].rank[0]=0;
+            pairs[i].pairs[numPair].rank[1]=0;
+            for (u8 bitNum = 0; bitNum < 8; ++bitNum) {
+                pairs[i].pairs[numPair].rank[0] += ((generation[bitNum] >> 1) & 1) << bitNum;
+                pairs[i].pairs[numPair].rank[1] += (generation[bitNum]& 1) << bitNum;
+            }
+            if(!NUMBER_ON_LEFT(posInConf[pairs[i].pairs[numPair].rank[0]].type) || !NUMBER_ON_RIGHT(posInConf[pairs[i].pairs[numPair].rank[1]].type)){
+                --numPair;
+                --pairs[i].numberOfPairs;
+                pairs[i].pairs=(Pair*) realloc(pairs[i].pairs,pairs[i].numberOfPairs*sizeof(Pairs));
+            }
+            for (u8 bitNum = 0; bitNum < 8; ++bitNum)
+                if(generation[bitNum]) {
+                    generation[bitNum]++;
+                    if (generation[bitNum]==4)
+                        generation[bitNum]=1;
+                    else
+                        break;
+                }
+        }
+    }
+
+    //todoo suprime paires impossible
+}
+
 void resolve(u8* target, u8* solution){
+    clock_t start = clock();
+
+    u8 searchSize;
+    for(searchSize=1;target[searchSize-1]!='\0';++searchSize) continue;
+    printTime(start,"Recuperation taille de la liste");
+
+    for(u8 i=0;i<searchSize;i++) printf("%d, %s",target[i],i==searchSize-1?"\n\n":"");
     //pour chaque caractere on cherche une paire de valeur x, y telle que confusion[x]^confusion[y]=target
+
+    PositionInConfusion posInConf[256];
+    initPositionsInConfusions(posInConf);
+    printTime( start,"Recuperation des positions");
+
+
+    Pairs pairs[searchSize];
+    initPairs(target,pairs,searchSize,posInConf);
+    printTime(start,"Liste des paires possibles");
 }
 
 int main(int argc, char* argv[])
@@ -120,9 +217,12 @@ int main(int argc, char* argv[])
     Forward(input,output,confusion,diffusion);
 
     u8 solution[32];
-    resolve(target, solution);
 
-    printf("Output : %s, Solution : %s\n", output,solution);
+    resolve(target, solution);
+    u8 myOutput[32];
+    Forward(solution, myOutput,confusion,diffusion);
+
+    printf("Target : %s \nOutput of solution: %s\n", target, myOutput);
 
     return memcmp(output,target,16); // => contact apply(at)nerd.nintendo.com
 }
