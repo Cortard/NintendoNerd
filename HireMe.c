@@ -155,34 +155,29 @@ typedef struct Pairs{
 } Pairs;
 void initPairs(const u8 target[], Pairs pairs[], u8 searchSize,PositionInConfusion posInConf[]){
     for(u8 i=0; i<searchSize;++i) {
-        pairs[i].numberOfPairs=1;
+        pairs[i].numberOfPairs=256;
         u8 generation[8];
         for (u8 bitNum = 0; bitNum < 8; ++bitNum){
-            generation[bitNum]= (target[i] >> bitNum) & 1;
-            if (generation[bitNum])
-                pairs[i].numberOfPairs *= 3;
+            // 0b 0000 00[0][0] [state][original value bit]
+            generation[bitNum]= (target[i] >> bitNum) &1 ;
         }
         pairs[i].pairs= malloc(pairs[i].numberOfPairs*sizeof(Pair));
         for(u32 numPair=0;numPair<pairs[i].numberOfPairs;++numPair){
             pairs[i].pairs[numPair].rank[0]=0;
             pairs[i].pairs[numPair].rank[1]=0;
             for (u8 bitNum = 0; bitNum < 8; ++bitNum) {
-                pairs[i].pairs[numPair].rank[0] += ((generation[bitNum] >> 1) & 1) << bitNum;
-                pairs[i].pairs[numPair].rank[1] += (generation[bitNum]& 1) << bitNum;
+                pairs[i].pairs[numPair].rank[0] += ((generation[bitNum]&2) >>1) <<bitNum;
+                pairs[i].pairs[numPair].rank[1] += (((generation[bitNum]&2) >>1)^(generation[bitNum])&1) << bitNum;
             }
             if(!NUMBER_ON_LEFT(posInConf[pairs[i].pairs[numPair].rank[0]].type) || !NUMBER_ON_RIGHT(posInConf[pairs[i].pairs[numPair].rank[1]].type)){
                 --numPair;
                 --pairs[i].numberOfPairs;
                 pairs[i].pairs=(Pair*) realloc(pairs[i].pairs,pairs[i].numberOfPairs*sizeof(Pairs));
             }
-            for (u8 bitNum = 0; bitNum < 8; ++bitNum)
-                if(generation[bitNum]) {
-                    generation[bitNum]++;
-                    if (generation[bitNum]==4)
-                        generation[bitNum]=1;
-                    else
-                        break;
-                }
+            for (u8 bitNum = 0; bitNum < 8; ++bitNum) {
+                generation[bitNum] = (generation[bitNum] & (~2)) ^ ( (!(generation[bitNum] & 2))<<1);
+                if(generation[bitNum]&2) break;
+            }
         }
     }
 }
@@ -215,7 +210,6 @@ int main(int argc, char* argv[])
     Forward(input,output,confusion,diffusion);
 
     u8 solution[32];
-
     resolve(target, solution);
     u8 myOutput[32];
     Forward(solution, myOutput,confusion,diffusion);
