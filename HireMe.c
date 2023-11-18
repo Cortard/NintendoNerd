@@ -72,7 +72,7 @@ void Forward(u8 c[32],u8 d[32],u8 s[512],u32 p[32])
 The solutions to this challenge belong to different levels :
 
 Level 1 : an iterative algorithm which typically takes more than a second to
-find a solution (for any given output).
+find -solution (for any given output).
 
 Most people stop here, which is fine, but if you want to go further, there is :
 
@@ -144,62 +144,47 @@ void initPositionsInConfusions(PositionInConfusion tab[256]){
         tab[*it].position[NUMBER_ON_LEFT(tab[*it].type)+NUMBER_ON_RIGHT(tab[*it].type)]=it-confusion;
         tab[*it].type+=( 1<<( (it>=mid)*2 ) );
     }
-};
+}
 
-typedef struct Pair{
-    u32 rank[2];
-}Pair;
-typedef struct Pairs{
-    u32 numberOfPairs;
-    Pair* pairs;
-} Pairs;
-void initPairs(const u8 target[], Pairs pairs[], u8 searchSize,PositionInConfusion posInConf[]){
-    for(u8 i=0; i<searchSize;++i) {
-        pairs[i].numberOfPairs=256;
-        u8 generation[8];
-        for (u8 bitNum = 0; bitNum < 8; ++bitNum){
-            // 0b 0000 00[0][0] [state][original value bit]
-            generation[bitNum]= (target[i] >> bitNum) &1 ;
-        }
-        pairs[i].pairs= malloc(pairs[i].numberOfPairs*sizeof(Pair));
-        for(u32 numPair=0;numPair<pairs[i].numberOfPairs;++numPair){
-            pairs[i].pairs[numPair].rank[0]=0;
-            pairs[i].pairs[numPair].rank[1]=0;
-            for (u8 bitNum = 0; bitNum < 8; ++bitNum) {
-                pairs[i].pairs[numPair].rank[0] += ((generation[bitNum]&2) >>1) <<bitNum;
-                pairs[i].pairs[numPair].rank[1] += (((generation[bitNum]&2) >>1)^(generation[bitNum])&1) << bitNum;
-            }
-            if(!NUMBER_ON_LEFT(posInConf[pairs[i].pairs[numPair].rank[0]].type) || !NUMBER_ON_RIGHT(posInConf[pairs[i].pairs[numPair].rank[1]].type)){
-                --numPair;
-                --pairs[i].numberOfPairs;
-                pairs[i].pairs=(Pair*) realloc(pairs[i].pairs,pairs[i].numberOfPairs*sizeof(Pairs));
-            }
-            for (u8 bitNum = 0; bitNum < 8; ++bitNum) {
-                generation[bitNum] = (generation[bitNum] & (~2)) ^ ( (!(generation[bitNum] & 2))<<1);
-                if(generation[bitNum]&2) break;
-            }
-        }
-    }
+void trouvePair(PositionInConfusion posInConf[256], u8* pair, u8 target){
+    // remplacer lecture tableau par pointeur que l'on deplace ?
+    // ne pas calculer target^complement mais une incrmentation ?
+    u8 complement=0;
+    while(!NUMBER_ON_LEFT(posInConf[target^complement].type) || !NUMBER_ON_RIGHT(posInConf[complement].type))
+        ++complement;
+    pair[0]=posInConf[target^complement].position[0];
+    pair[1]=posInConf[complement].position[NUMBER_ON_LEFT(posInConf[complement].type)]-256;
 }
 
 void resolve(u8* target, u8* solution){
     clock_t start = clock();
 
     u8 searchSize;
-    for(searchSize=1;target[searchSize-1]!='\0';++searchSize) continue;
+    for(searchSize=0;target[searchSize++]!='\0';) continue;
     printTime(start,"Recuperation taille de la liste");
-
-    for(u8 i=0;i<searchSize;i++) printf("%d, %s",target[i],i==searchSize-1?"\n\n":"");
-    //pour chaque caractere on cherche une paire de valeur x, y telle que confusion[x]^confusion[y]=target
 
     PositionInConfusion posInConf[256];
     initPositionsInConfusions(posInConf);
-    printTime( start,"Recuperation des positions");
+    printTime(start,"Recuperation des positions");
 
+    u8* it=solution;
+    for(u8 i=0;i<searchSize;++i) {
+        trouvePair(posInConf, it, target[i]);
+        it+=2;
+    }
+    printTime(start,"First loop reverse");
 
-    Pairs pairs[searchSize];
-    initPairs(target,pairs,searchSize,posInConf);
-    printTime(start,"Liste des paires possibles");
+    u8 pattern[32][32];
+    for(u8 j=0;j<32;j++)
+        for(u8 k=0;k<32;k++)
+            pattern[j][k]=((diffusion[j] >> k) & 1);
+    printTime(start,"Recuperation du pattern de diffusion");
+
+    for(u8 j=0;j<32;j++)
+        for(u8 k=0;k<32;k++)
+            printf("%s%s",pattern[j][k]?"#":" ",k==31?"\n":" ");
+
+    for(u8 i=0;i<searchSize;++i) target[i]=65;
 }
 
 int main(int argc, char* argv[])

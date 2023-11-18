@@ -1,0 +1,66 @@
+
+typedef struct Pair{
+    u32 rank[2];
+}Pair;
+typedef struct Pairs{
+    u32 numberOfPairs;
+    Pair* pairs;
+} Pairs;
+void initPairs(const u8 target[], Pairs pairs[], u8 searchSize,PositionInConfusion posInConf[]){
+    for(u8 i=0; i<searchSize;++i) {
+
+        pairs[i].numberOfPairs=256;
+        u8 generation=0;
+        pairs[i].pairs= malloc(pairs[i].numberOfPairs*sizeof(Pair));
+        for(u32 numPair=0;numPair<pairs[i].numberOfPairs;++numPair){
+
+            pairs[i].pairs[numPair].rank[0]=generation;
+            pairs[i].pairs[numPair].rank[1]=generation^target[i];
+
+            if(!NUMBER_ON_LEFT(posInConf[pairs[i].pairs[numPair].rank[0]].type) || !NUMBER_ON_RIGHT(posInConf[pairs[i].pairs[numPair].rank[1]].type)){
+                --numPair;
+                --pairs[i].numberOfPairs;
+            }
+
+            ++generation;
+        }
+
+        pairs[i].pairs=(Pair*) realloc(pairs[i].pairs,pairs[i].numberOfPairs*sizeof(Pairs));
+    }
+}
+
+void resolveAll(u8* target, u8* solution){
+    clock_t start = clock();
+
+    u8 searchSize;
+    for(searchSize=1;target[searchSize-1]!='\0';++searchSize) continue;
+    printTime(start,"Recuperation taille de la liste");
+
+    for(u8 i=0;i<searchSize;i++) printf("%d, %s",target[i],i==searchSize-1?"\n\n":"");
+    //pour chaque caractere on cherche une paire de valeur x, y telle que confusion[x]^confusion[y]=target
+
+    PositionInConfusion posInConf[256];
+    initPositionsInConfusions(posInConf);
+    printTime( start,"Recuperation des positions");
+
+    Pairs pairs[searchSize];
+    initPairs(target,pairs,searchSize,posInConf);
+    printTime(start,"Liste des paires possibles");
+
+    /*
+    for(u8 j=0;j<32;j++)
+        for(u8 k=0;k<32;k++)
+            input[j] = input[j] ^  (output[k] * pattern[j][k])
+
+    0^x^y=z
+    */
+    u8 pattern[32][32];
+    for(u8 j=0;j<32;j++)
+        for(u8 k=0;k<32;k++)
+            pattern[j][k]=((diffusion[j] >> k) & 1);
+    printTime(start,"Recuperation du pattern de diffusion");
+
+    for(u8 j=0;j<32;j++)
+        for(u8 k=0;k<32;k++)
+            printf("%d%s",pattern[j][k],k==31?"\n":", ");
+}
