@@ -1,5 +1,18 @@
 #include <string.h>
 
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  ((byte) & 0x80 ? '1' : '0'), \
+  ((byte) & 0x40 ? '1' : '0'), \
+  ((byte) & 0x20 ? '1' : '0'), \
+  ((byte) & 0x10 ? '1' : '0'), \
+  ((byte) & 0x08 ? '1' : '0'), \
+  ((byte) & 0x04 ? '1' : '0'), \
+  ((byte) & 0x02 ? '1' : '0'), \
+  ((byte) & 0x01 ? '1' : '0')
+#define U32_TO_BINARY_PATTERN BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN" "BYTE_TO_BINARY_PATTERN
+#define U32_TO_BINARY(u32) BYTE_TO_BINARY(u32>>24), BYTE_TO_BINARY(u32>>16), BYTE_TO_BINARY(u32>>8), BYTE_TO_BINARY(u32)
+
 typedef unsigned char u8;
 typedef unsigned int u32;
 
@@ -109,7 +122,6 @@ void ForwardReadable(u8 output[32])
 
 
 #include <stdio.h>
-#include <malloc.h>
 
 #include <time.h>
 void printTime(clock_t start, char msg[]){
@@ -118,42 +130,99 @@ void printTime(clock_t start, char msg[]){
     printf("%s : %.3f seconds\n",msg, elapsed);
 }
 
-//A=absent P=present _=rang 256s
-//0b[00][00] => 0b[nbPresentSecondPart][nbPresentFirstPart]
-#define A       0  //=> 0b0000
-#define P_A     1  //=> 0b0001
-#define PP_A    2  //=> 0b0010
-#define A_P     4  //=> 0b0100
-#define P_P     5  //=> 0b0101
-#define PP_P    6  //=> 0b0110
-#define A_PP    8  //=> 0b1000
-#define P_PP    9  //=> 0b1001
+//type == 0b[00][00] => 0b[nbPresentSecondPart][nbPresentFirstPart]
 #define NUMBER_ON_LEFT(x) (x&3) //=>0b00xx
 #define NUMBER_ON_RIGHT(x) ((x>>2)&3) //=>0bxx00 => 0b00xx
 typedef struct PositionInConfusion{
     u8 type;
-    u8 position[3];
+    u8 position[3];//WARNING position in right part are stored -256
 } PositionInConfusion;
 
 void initPositionsInConfusions(PositionInConfusion tab[256]){
     for(PositionInConfusion* it=tab;it<tab+256;++it) it->type=0;
-    u8* it=confusion;
+
     u8* mid=confusion+256;
     u8* end=confusion+512;
-    for(;it<end;++it){
-        tab[*it].position[NUMBER_ON_LEFT(tab[*it].type)+NUMBER_ON_RIGHT(tab[*it].type)]=it-confusion;
+    for(u8* it=confusion;it<end;++it){
+        tab[*it].position[NUMBER_ON_LEFT(tab[*it].type)+NUMBER_ON_RIGHT(tab[*it].type)]=(it-confusion)%256;
         tab[*it].type+=( 1<<( (it>=mid)*2 ) );
     }
 }
 
 void trouvePair(PositionInConfusion posInConf[256], u8* pair, u8 target){
     // remplacer lecture tableau par pointeur que l'on deplace ?
-    // ne pas calculer target^complement mais une incrmentation ?
+    // ne pas calculer target^complement mais une incrementation ?
     u8 complement=0;
     while(!NUMBER_ON_LEFT(posInConf[target^complement].type) || !NUMBER_ON_RIGHT(posInConf[complement].type))
         ++complement;
     pair[0]=posInConf[target^complement].position[0];
-    pair[1]=posInConf[complement].position[NUMBER_ON_LEFT(posInConf[complement].type)]-256;
+    pair[1]=posInConf[complement].position[NUMBER_ON_LEFT(posInConf[complement].type)];
+}
+
+void displaySystem(const u32 left[32],const u32 right[32]){
+    for(u8 j=0;j<32;j++) {
+        printf("{ ");
+        for (u8 k = 0; k < 32; k++)
+            printf("%d, ", left[j]>>(31-k) & 1 );
+        printf("} = {");
+        for (u8 k = 0; k < 32; k++)
+            printf("%d, ", right[j]>>(31-k) & 1 );
+        printf("}\n");
+    }
+}
+void displayPart(const u32 part[32]){
+    for(u8 j=0;j<32;j++) {
+        printf("{ ");
+        for (u8 k = 0; k < 32; k++)
+            printf("%d, ", part[j]>>(31-k) & 1 );
+        printf("}\n");
+    }
+}
+
+void swap(u32 array[32], int i, int j){
+    u32 _temp=array[i];
+    array[i]=array[j];
+    array[j]=_temp;
+}
+
+//start pivot with i=31
+#define bit(x,i) ((x>>(i)) &1)
+int pivot(int i, u32 leftPart[32], u32 rightPart[32], u32 originalLeft[32], u32 originalRight[32]){
+    if(i<0) return 1;
+    if(i>31) return pivot(31,leftPart,rightPart,originalLeft,originalRight);
+    int pivotRow=i;
+    u8 success=0;
+    while (pivotRow>=0 && !success){
+        //if the row can be a pivot
+        if(bit(leftPart[pivotRow],i)){
+            success=1;
+            //swap to have the triangle form
+            if(pivotRow!=i){
+                swap(leftPart,i,pivotRow);
+                swap(rightPart,i,pivotRow);
+            }
+            //apply pivot to other
+            for (int other = i-1; other>=0 ; --other) {
+                if(bit(leftPart[other],i)) {
+                    leftPart[other] ^= leftPart[i];
+                    if ( ! leftPart[other] ) {
+                        success = 0;
+                        break;
+                    }
+                    rightPart[other] |= 1 << i;
+                }
+            }
+            if(success)
+                success=pivot(i-1,leftPart,rightPart,originalLeft,originalRight);
+            if(!success){
+                memcpy(leftPart,originalLeft, (i+1)*sizeof(u32));
+                memcpy(rightPart,originalRight, (i+1)*sizeof(u32));
+            }
+        } else success=0;
+        --pivotRow;
+    }
+
+    return success;
 }
 
 void resolve(u8* target, u8* solution){
@@ -174,17 +243,24 @@ void resolve(u8* target, u8* solution){
     }
     printTime(start,"First loop reverse");
 
-    u8 pattern[32][32];
-    for(u8 j=0;j<32;j++)
-        for(u8 k=0;k<32;k++)
-            pattern[j][k]=((diffusion[j] >> k) & 1);
-    printTime(start,"Recuperation du pattern de diffusion");
 
-    for(u8 j=0;j<32;j++)
-        for(u8 k=0;k<32;k++)
-            printf("%s%s",pattern[j][k]?"#":" ",k==31?"\n":" ");
+    u32 diffusionRight[32];
+    for(u8 i=0;i<32;++i) diffusionRight[i]=1<<(31-i);
 
-    for(u8 i=0;i<searchSize;++i) target[i]=65;
+    u32 leftPart[32];
+    memcpy(leftPart,diffusion,32* sizeof(u32));
+    u32 rightPart[32];
+    memcpy(rightPart,diffusionRight,32* sizeof(u32));
+    printTime(start,"Copy system");
+
+    if(! pivot(31,leftPart,rightPart,diffusion,diffusionRight)){
+        printf("Echec creation system\n");
+        return;
+    }
+    printTime(start,"Creation system avec pivot de gauss");
+
+
+    for(u8 i=0;i<searchSize;++i) solution[i]=65;
 }
 
 int main(int argc, char* argv[])
@@ -201,5 +277,5 @@ int main(int argc, char* argv[])
 
     printf("Target : %s \nOutput of solution: %s\n", target, myOutput);
 
-    return memcmp(output,target,16); // => contact apply(at)nerd.nintendo.com
+    return memcmp(output,myOutput,16); // => contact apply(at)nerd.nintendo.com
 }
