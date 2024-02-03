@@ -8,6 +8,7 @@ void readableForward(u8 input[32], u8 output[32], const u8 confusion[512], const
 
 void confusionAnalyse(const u8 confusion[512]);
 
+//pre computation
 typedef struct PosInConfusion{
     u8 nbLeft;
     u8 posLeft[2];
@@ -16,5 +17,7 @@ typedef struct PosInConfusion{
 }PosInConfusion;
 extern PosInConfusion confusionReversed[256];
 void reverseConfusion(const u8 confusion[512]);
+
+
 
 #endif //NINTENDONERD_SOLVER_H
