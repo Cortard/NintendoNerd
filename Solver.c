@@ -1,6 +1,8 @@
+#include <memory.h>
+#include <stdio.h>
 #include "Solver.h"
 
-void ReadableForward(u8 input[32], u8 output[32], const u8 confusion[512], const u32 diffusion[32])
+void readableForward(u8 input[32], u8 output[32], const u8 confusion[512], const u32 diffusion[32])
 {
     //just 32 time the process, no use of the iterator
     for(u32 i=0;i<256;i++)
@@ -29,3 +31,46 @@ void ReadableForward(u8 input[32], u8 output[32], const u8 confusion[512], const
 //a^b=b^a
 //a^(b^c)=(a^b)^c
 
+void confusionAnalyse(const u8 confusion[512]){
+    u8 nbFoundLeft[256];
+    memset(nbFoundLeft,0, sizeof(nbFoundLeft));
+    u8 nbFoundRight[256];
+    memset(nbFoundRight,0, sizeof(nbFoundRight));
+
+    for(u32 i=0;i<512;++i){
+        if(i<256)
+            ++nbFoundLeft[confusion[i]];
+        else
+            ++nbFoundRight[confusion[i]];
+    }
+
+    u8 missingLeft=0;
+    u8 missingRight=0;
+    for(u32 i=0;i<256;++i){
+        if(nbFoundLeft[i]==0)
+            ++missingLeft;
+        if(nbFoundRight[i]==0)
+            ++missingRight;
+    }
+    printf("Missing %d left and %d right\n",missingLeft,missingRight);
+
+    u8 maxLeft=nbFoundLeft[0];
+    u8 maxRight=nbFoundRight[0];
+    for(u32 i=1;i<256;++i){
+        if(nbFoundLeft[i]>maxLeft)
+            maxLeft=nbFoundLeft[i];
+        if(nbFoundRight[i]>maxRight)
+            maxRight=nbFoundRight[i];
+    }
+    printf("Max appearing %d left and %d right\n",maxLeft,maxRight);
+
+    u8 totalMax=nbFoundLeft[0]+nbFoundRight[0];
+    u8 totalMaxValue=0;
+    for(u32 i=1;i<256;++i){
+        if(nbFoundLeft[i]+nbFoundRight[i]>totalMax){
+            totalMax=nbFoundLeft[i]+nbFoundRight[i];
+            totalMaxValue=i;
+        }
+    }
+    printf("Max appearing total %d with value %d(%x)\n",totalMax,totalMaxValue,totalMaxValue);
+}

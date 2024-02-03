@@ -93,6 +93,8 @@ Even fewer people have reached this final level. Congratulations to them!
 
 int main(int argc, char* argv[])
 {
+    confusionAnalyse(confusion);
+
     u8 target[]="Hire me!!!!!!!!";
     u8 output[32];
 
