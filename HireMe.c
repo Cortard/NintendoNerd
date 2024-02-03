@@ -89,6 +89,8 @@ Even fewer people have reached this final level. Congratulations to them!
 
 */
 
+#include "Solver.h"
+
 int main(int argc, char* argv[])
 {
     u8 target[]="Hire me!!!!!!!!";
