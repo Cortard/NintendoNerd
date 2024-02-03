@@ -74,3 +74,14 @@ void confusionAnalyse(const u8 confusion[512]){
     }
     printf("Max appearing total %d with value %d(%x)\n",totalMax,totalMaxValue,totalMaxValue);
 }
+
+PosInConfusion confusionReversed[256];
+void reverseConfusion(const u8 confusion[512]){
+    memset(confusionReversed,0, sizeof(confusionReversed));
+    for(u32 i=0;i<512;++i){
+        if(i<256)
+            ++confusionReversed[confusion[i]].posLeft[ confusionReversed[confusion[i]].nbLeft++ ];
+        else
+            ++confusionReversed[confusion[i]].posRight[ confusionReversed[confusion[i]].nbRight++ ];
+    }
+}
